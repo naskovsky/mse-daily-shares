@@ -6,7 +6,8 @@ import os
 from xml.etree import ElementTree
 from zeep import Client
 
-sharequantity = input("plase enter the quantity of shares: ")
+share_name = input("Enter the name of the stock: ")
+stockquantity = input("Enter the quantity of shares: ")
 
 URL = "https://www.mse.mk/Repository/Reports/2021/"
 
@@ -79,7 +80,6 @@ def get_download_link_weekend():
 
 if 0 < n < 6:  # work days
     date_format = day + "." + month + "." + year + "en.xls"
-    # print(date_format)
     download_link = URL + date_format
 else:  # weekend
     date_format = get_friday_date() + "." + month + "." + year + "en.xls"
@@ -114,22 +114,26 @@ for kurs in kursevi:
     cena = kurs.find('Sreden').text
     if oznaka == 'EUR' or oznaka == 'USD':
         niza.append(KursKlasa(oznaka, cena))
-# print(' * {} {}'.format(
-# oznaka, cena
-# ))
 
-daily_price = df.iat[4, 1]
-percentile_change = df.iat[4, 2]
-if percentile_change > 0:
-    percentile_change = "+" + str(percentile_change)
-max_price = df.iat[4, 5] * int(sharequantity)
-min_price = df.iat[4, 6] * int(sharequantity)
-avg_price_denar = (df.iat[4, 1] * int(sharequantity))
-avg_price_euro = (df.iat[4, 1] * int(sharequantity)) / float(niza[0].vrati_cena())
-avg_price_dollar = (df.iat[4, 1] * int(sharequantity)) / float(niza[1].vrati_cena())
-dividend = 550 * int(sharequantity)
-dividend_euro = dividend / float(niza[0].vrati_cena())
-dividend_dollar = dividend / float(niza[1].vrati_cena())
+# declaring the variables for global use
+daily_price = 0
+
+for x in range(4, 304):
+    ime = df.iat[x, 0].lower()
+    if share_name in ime:
+        daily_price = df.iat[x, 1]
+        percentile_change = df.iat[x, 2]
+        if percentile_change > 0:
+            percentile_change = "+" + str(percentile_change)
+        max_price = (df.iat[x, 5] * int(stockquantity))
+        min_price = (df.iat[x, 6] * int(stockquantity))
+        avg_price_denar = (daily_price * int(stockquantity))
+        avg_price_euro = (daily_price * int(stockquantity)) / float(niza[0].vrati_cena())
+        avg_price_dollar = (daily_price * int(stockquantity)) / float(niza[1].vrati_cena())
+        dividend = 550 * int(stockquantity)
+        dividend_euro = dividend / float(niza[0].vrati_cena())
+        dividend_dollar = dividend / float(niza[1].vrati_cena())
+        break
 
 
 def get_trading_date():
@@ -138,6 +142,12 @@ def get_trading_date():
     else:  # weekend
         return get_friday_date() + "." + month + "." + year
 
+
+try:
+    daily_price
+except NameError:
+    print("Akcijata koja ja pobaravte, ne e pronajdena!")
+    exit(-1)
 
 # TODO: weekend date evaluator for last friday
 print("Датум: " + get_trading_date())
