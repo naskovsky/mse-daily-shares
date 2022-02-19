@@ -1,5 +1,5 @@
 from tabulate import tabulate
-import datetime
+from bs4 import BeautifulSoup
 import requests
 import pandas as pd
 import os
@@ -9,7 +9,7 @@ from zeep import Client
 share_name = input("Enter the name of the stock: ")
 stockquantity = input("Enter the quantity of shares: ")
 
-URL = "https://www.mse.mk/Repository/Reports/2021/"
+base_url = "https://www.mse.mk"
 
 
 class KursKlasa:
@@ -27,63 +27,20 @@ class KursKlasa:
     def pecati_dvete(self):
         return self.oznaka + " " + self.cena
 
+# gets the contents of the href in the a tag
+content = requests.get(base_url)
+soup = BeautifulSoup(content.text, 'html.parser')
+find_a = soup.find_all('a')
+temp = find_a[4]
+base_url = base_url + temp['href']
 
-# getting the dates for the functions
-x = datetime.datetime.now()
-day = x.strftime("%d")
-month = x.strftime("%m")
-year = x.strftime("%Y")
-date_format = day + "." + month + "." + year + "en.xls"
-datum = day + "." + month + "." + year
-week_day = x.strftime("%A")
-week_day_number = x.strftime("%w")
-n = int(week_day_number)
-download_link = ""
+# date formatting
+date = base_url[43:53]
+# "mk.xls" needed so it can read from file
+date_format = date + "mk.xls"
+date_weekday = pd.Timestamp(date)
 
-
-def get_friday_date():
-    day_change = 0
-    if week_day_number == "6":
-        day_change = int(day) - 1
-        # print(day_change)
-    if week_day_number == "0":
-        day_change = int(day) - 2
-        # print(day_change)
-    day_change_str = str(day_change)
-    if day_change < 10:
-        day_change_str = "0" + str(day_change)
-    return day_change_str
-
-
-def get_weekday_macedonian():
-    weekday_macedonian = ""
-    if week_day_number == "6" or week_day_number == "0":
-        weekday_macedonian = "Петок"
-    elif week_day_number == "1":
-        weekday_macedonian = "Понеделник"
-    elif week_day_number == "2":
-        weekday_macedonian = "Вторник"
-    elif week_day_number == "3":
-        weekday_macedonian = "Среда"
-    elif week_day_number == "4":
-        weekday_macedonian = "Четврток"
-    elif week_day_number == "5":
-        weekday_macedonian = "Петок"
-    return weekday_macedonian
-
-
-def get_download_link_weekend():
-    date_format_weekend = get_friday_date() + "." + month + "." + year + "en.xls"
-    download_link_weekend = URL + date_format_weekend
-    return download_link_weekend
-
-
-if 0 < n < 6:  # work days
-    date_format = day + "." + month + "." + year + "en.xls"
-    download_link = URL + date_format
-else:  # weekend
-    date_format = get_friday_date() + "." + month + "." + year + "en.xls"
-    download_link = get_download_link_weekend()
+download_link = base_url
 
 # downloads the xls file from mse that contains the daily prices of the shares
 r = requests.get(download_link, allow_redirects=True)
@@ -94,7 +51,7 @@ df = pd.read_excel(date_format)
 
 # makes soap request to nbrm and recieves a xml file
 client = Client(wsdl='https://www.nbrm.mk/klservice/kurs.asmx?WSDL')
-price_list = client.service.GetExchangeRate(datum, datum).encode()
+price_list = client.service.GetExchangeRate(date, date).encode()
 
 # saving the xml file
 file = open('kursna_lista.xml', 'wb')
@@ -135,14 +92,6 @@ for x in range(4, 304):
         dividend_dollar = dividend / float(niza[1].vrati_cena())
         break
 
-
-def get_trading_date():
-    if 0 < n < 6:  # work days
-        return day + "." + month + "." + year
-    else:  # weekend
-        return get_friday_date() + "." + month + "." + year
-
-
 try:
     daily_price
 except NameError:
@@ -150,8 +99,8 @@ except NameError:
     exit(-1)
 
 # TODO: weekend date evaluator for last friday
-print("Датум: " + get_trading_date())
-print("Trading day: " + get_weekday_macedonian())
+print("Датум: " + date)
+print("Trading day: " + str(date_weekday.day_name()))
 print(
     "*********************************************************************************************************************************************************************************")
 
