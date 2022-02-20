@@ -5,27 +5,12 @@ import pandas as pd
 import os
 from xml.etree import ElementTree
 from zeep import Client
+from kurs import Kurs
 
-share_name = input("Enter the name of the stock: ")
-stockquantity = input("Enter the quantity of shares: ")
+share_name = input("Внесете го името на акцијата: ")
+stockquantity = input("Внесете ја количината на акции: ")
 
 base_url = "https://www.mse.mk"
-
-
-class KursKlasa:
-
-    def __init__(self, _oznaka, _cena):
-        self.oznaka = _oznaka
-        self.cena = _cena
-
-    def vrati_oznaka(self):
-        return self.oznaka
-
-    def vrati_cena(self):
-        return self.cena
-
-    def pecati_dvete(self):
-        return self.oznaka + " " + self.cena
 
 # gets the contents of the href in the a tag
 content = requests.get(base_url)
@@ -70,7 +55,8 @@ for kurs in kursevi:
     oznaka = kurs.find('Oznaka').text
     cena = kurs.find('Sreden').text
     if oznaka == 'EUR' or oznaka == 'USD':
-        niza.append(KursKlasa(oznaka, cena))
+        kurs_klasa = Kurs(oznaka, cena)
+        niza.append(kurs_klasa)
 
 # declaring the variables for global use
 daily_price = 0
