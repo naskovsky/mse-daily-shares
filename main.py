@@ -3,12 +3,10 @@ from bs4 import BeautifulSoup
 import requests
 import pandas as pd
 import os
-from xml.etree import ElementTree
-from zeep import Client
-from kurs import Kurs
+import json
 
-share_name = input("Внесете го името на акцијата: ")
-stockquantity = input("Внесете ја количината на акции: ")
+share_name = input("Внесете го името на акцијата: ").strip()
+stockquantity = input("Внесете ја количината на акции: ").strip()
 
 base_url = "https://www.mse.mk"
 
@@ -34,29 +32,15 @@ open(date_format, 'wb').write(r.content)
 # reads the xls file and stores it in df
 df = pd.read_excel(date_format)
 
-# makes soap request to nbrm and recieves a xml file
-client = Client(wsdl='https://www.nbrm.mk/klservice/kurs.asmx?WSDL')
-price_list = client.service.GetExchangeRate(date, date).encode()
+# loads the json
+kl_json = json.loads(requests.get(
+    f"https://www.nbrm.mk/KLServiceNOV/GetExchangeRates?StartDate={date}&EndDate={date}&format=json").text)
 
-# saving the xml file
-file = open('kursna_lista.xml', 'wb')
-file.write(price_list)
-file.close()
+# filters only eur and usd currency info
+kl_dict = {item['oznaka']: item['prodazen'] for item in kl_json if item['oznaka'] in ['EUR', 'USD']}
 
-# reading the xml file
-file_name = 'kursna_lista.xml'
-dom = ElementTree.parse(file_name)
-kursevi = dom.findall('KursZbir')
-
-niza = []
-
-for kurs in kursevi:
-
-    oznaka = kurs.find('Oznaka').text
-    cena = kurs.find('Sreden').text
-    if oznaka == 'EUR' or oznaka == 'USD':
-        kurs_klasa = Kurs(oznaka, cena)
-        niza.append(kurs_klasa)
+euro = float(kl_dict['EUR'])
+dollar = float(kl_dict['USD'])
 
 # declaring the variables for global use
 daily_price = 0
@@ -71,11 +55,13 @@ for x in range(4, 304):
         max_price = (df.iat[x, 5] * int(stockquantity))
         min_price = (df.iat[x, 6] * int(stockquantity))
         avg_price_denar = (daily_price * int(stockquantity))
-        avg_price_euro = (daily_price * int(stockquantity)) / float(niza[0].vrati_cena())
-        avg_price_dollar = (daily_price * int(stockquantity)) / float(niza[1].vrati_cena())
+        # avg_price_euro = (daily_price * int(stockquantity)) / float(niza[0].vrati_cena())
+        avg_price_euro = (daily_price * int(stockquantity)) / euro
+        # avg_price_dollar = (daily_price * int(stockquantity)) / float(niza[1].vrati_cena())
+        avg_price_dollar = (daily_price * int(stockquantity)) / dollar
         dividend = 550 * int(stockquantity)
-        dividend_euro = dividend / float(niza[0].vrati_cena())
-        dividend_dollar = dividend / float(niza[1].vrati_cena())
+        dividend_euro = dividend / euro
+        dividend_dollar = dividend / dollar
         break
 
 try:
@@ -97,8 +83,8 @@ def print_dialy_price():
             "Евра": ["€{:,.2f}".format(avg_price_euro)],
             "Долари": ["${:,.2f}".format(avg_price_dollar)],
             "% Change": [percentile_change],
-            "Евро курс": ["Ден - {:,.4f}".format(float(niza[0].vrati_cena()))],
-            "Долар курс": ["Ден - {:,.4f}".format(float(niza[1].vrati_cena()))],
+            "Евро курс": ["Ден - {:,.4f}".format(euro)],
+            "Долар курс": ["Ден - {:,.4f}".format(dollar)],
             "Дивидена - 2020": ["Ден - 550"],
             "Дивиденда денари": ["Ден - {:,.2f}".format(dividend)],
             "Дивиденда евро": ["€{:,.2f}".format(dividend_euro)],
@@ -108,6 +94,5 @@ def print_dialy_price():
 
 print(print_dialy_price())
 
-# remove the xls and xml files from the directory
-os.remove(file_name)
+# remove the xls file from the directory
 os.remove(date_format)
